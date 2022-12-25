@@ -18,4 +18,5 @@ calculate the dividend price ratio and sent alert based system.
 * Stocks in different markets are not traded on same days: need to create an homogeneous date grid (discrete data points):
 * Main code in `get_stock_prices.ipynb` 
 * Check if I need to create virtual env 
+* Add `.gitignore file`: :white_check_mark:
 
