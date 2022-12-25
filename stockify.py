@@ -3,7 +3,9 @@ Set of function to import financial data from API
 '''
 import pandas as pd 
 
-def get_list_stocks_tickers(text_file_name: str) -> list:
+def get_list_stocks_tickers(text_file_name: str,
+                            only_stock_tickers:bool) -> list:
+    
     with open(text_file_name, "r") as f:
         '''
         Read text file with lists of stocks tickers and return a
@@ -18,9 +20,12 @@ def get_list_stocks_tickers(text_file_name: str) -> list:
             n_line +=1 
             for n_col in range(len(s)):
                 df.loc[n_line,head[n_col]]=s[n_col]
-        stock_tickers = list(df.iloc[:,1]) 
-    
-    return stock_tickers
+                
+        if only_stock_tickers == True:
+            stock_tickers = list(df.iloc[:,1]) 
+            return stock_tickers
+        else:
+            return df
 
 def get_daily_time_buckets(max_lookback_years:int,
                            current_is_timestamp:bool,

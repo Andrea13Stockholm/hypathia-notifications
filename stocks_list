@@ -1,2 +1,2 @@
-company_name,ticker
-Apple Inc.,AAPL
+company_name,ticker,target_variable,alert_level_percentage
+Apple Inc.,AAPL,DP_ratio,0.10
