@@ -1,4 +1,2 @@
 polygon-api-client
-polygon
-pandas
 

@@ -68,33 +68,29 @@ def get_daily_time_buckets(max_lookback_years:int,
                                  inclusive='both') 
     return time_buckets 
 
-def get_p_process_by_ticker(ticker:str,
+def get_p_process_by_ticker(API_key:str,
+                            client,
+                            ticker:str,
                             timestamps_list:list,
                             stock_prices_frequency:str):
     
     '''
     Getting the price by specified ticker
     '''
-  
-    from polygon import RESTClient
-    from polygon.rest import models
-    
-    API_key = "PuJHla6_U_GDHcNE3XSpk7L2gCCpdJ9J"
-    client = RESTClient(API_key)
     
     _from_ = timestamps_list.min().date()
     _to_ = timestamps_list.max().date()
     
     if stock_prices_frequency == 'daily':
-        
-        aggs = client.get_aggs(
-                    ticker,
-                    1,
-                    "day",
-                    _from_,
-                    _to_,
-                )
-        
+              
+            aggs = client.get_aggs(
+                        ticker,
+                        1,
+                        "day",
+                        _from_,
+                        _to_,
+                    )
+
     return aggs
 
 
@@ -156,6 +152,7 @@ def get_serialized_raw_into_json(raw_response:list,
     Takes a dump of Agg objects list and returns each row as a json
     in a jsonList.
     '''
+    import json
     
     jsonList = []
     
@@ -168,12 +165,27 @@ def get_serialized_raw_into_json(raw_response:list,
         
     return jsonList
 
-def get_jsonList_into_dataframe(jsonList:list) -> pd.DataFrame:
+def get_jsonList_into_dataframe(_json_serialized_results:list,
+                                target_variables:list) -> pd.DataFrame:
     
     ''' 
-    Transform list into a dataframe
+    Transform the raw extracted response into a dataframe, adding
+    the target variables as columns
     '''
     
-    import pandas as pd 
+    import pandas as pd
     
-    return jsonList
+    df1 = pd.DataFrame.from_dict(_json_serialized_results) 
+
+    for n_rows in range(df1.shape[0]):
+        
+        df1.loc[n_rows,'converted_utc_timestamp']=df1['financial_data'][n_rows]['converted_utc_timestamp']
+        
+        for tv in target_variables:
+            df1.loc[n_rows,tv]=df1['financial_data'][n_rows][tv]
+        
+        sel_columns = ['stock','converted_utc_timestamp'] + target_variables
+        
+        df2 = df1[sel_columns].copy()
+        
+    return df2
