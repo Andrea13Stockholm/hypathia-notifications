@@ -8,9 +8,10 @@ calculate the dividend price ratio and sent alert based system.
 * API secrets should be contained in a separate thingy
 * Raise exception if stock does not exist, but continue run the code
 * Raise exception when calls limit is reached,  but continue run the code
-* Get dividens process and match with prices
+* Get dividends process and match with prices
 * Calculate the dividend price ratio
 * Get posted in slack
+* Add if lookback period more than 2 years than stop execution (temporary given our account):  :white_check_mark:
 * Automatize the notification: run the job on a schedule, send the notification when threshold is reached: Airflow
 * Get the required packages outside the main python file:  :white_check_mark:
 * Black/np-black formatting:  :white_check_mark:

@@ -3,6 +3,7 @@ Set of function to import financial data from API
 '''
 import pandas as pd 
 
+
 def get_list_stocks_tickers(text_file_name: str,
                             only_stock_tickers:bool) -> list:
     
@@ -26,8 +27,22 @@ def get_list_stocks_tickers(text_file_name: str,
             return stock_tickers
         else:
             return df
+        
+        
+def check_max_lookback_years(max_lookback_years: float):
+    '''
+    Check to avoid inserting over limit lookback period. 
+    If more than 2 years are inserted, the function forces
+    the limit to 2 years.
+    '''
+    
+    if max_lookback_years > 2:
+        max_lookback_years = 2
+        
+    return max_lookback_years
 
-def get_daily_time_buckets(max_lookback_years:int,
+
+def get_daily_time_buckets(max_lookback_years:float,
                            current_is_timestamp:bool,
                            frequency:str,
                            include_weekend:bool 
@@ -37,6 +52,8 @@ def get_daily_time_buckets(max_lookback_years:int,
     Get a range of discrete time points, given a current
     time as final data point. Frequency: daily or monthly.
     '''
+    
+    max_lookback_years = check_max_lookback_years(max_lookback_years)
     
     import pandas as pd 
     import datetime as dt 
@@ -72,6 +89,7 @@ def get_daily_time_buckets(max_lookback_years:int,
                                  tz='UTC', 
                                  inclusive='both') 
     return time_buckets 
+
 
 def get_p_process_by_ticker(API_key:str,
                             client,
@@ -120,7 +138,7 @@ def from_unix_time_to_timestamp(unix_time:int,
     return ddconv
     
 
-def get_serialized_raw_resp(self,
+def get_serialized_price_raw_resp(self,
                             ticker:str):
     ''' 
     Serializes a row raw response, including 
@@ -145,13 +163,14 @@ def get_serialized_raw_resp(self,
                         "wrap": self.vwap,
                         "timestamp": self.timestamp,
                         "converted_utc_timestamp":from_unix_time_to_timestamp(self.timestamp,
-                                                                        adjust_from_ms_to_sec=True),
+                                                                              adjust_from_ms_to_sec=True),
                         "transactions":self.transactions,
                         "otc":self.otc
                 }
             }
 
-def get_serialized_raw_into_json(raw_response:list,
+
+def get_serialized_price_raw_into_json(raw_response:list,
                                 ticker:str):
     ''' 
     Takes a dump of Agg objects list and returns each row as a json
@@ -162,7 +181,7 @@ def get_serialized_raw_into_json(raw_response:list,
     jsonList = []
     
     for raw in raw_response:
-        serie = get_serialized_raw_resp(raw,ticker)
+        serie = get_serialized_price_raw_resp(raw,ticker)
         
         jsonDict = json.loads(json.dumps(serie))
         
@@ -170,7 +189,8 @@ def get_serialized_raw_into_json(raw_response:list,
         
     return jsonList
 
-def get_jsonList_into_dataframe(_json_serialized_results:list,
+
+def get_jsonList_prices_into_dataframe(_json_serialized_results:list,
                                 target_variables:list) -> pd.DataFrame:
     
     ''' 
