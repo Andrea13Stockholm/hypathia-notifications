@@ -14,7 +14,6 @@ calculate the dividend price ratio and sent alert based system.
 * Main code in `get_stock_prices.ipynb`: :white_check_mark:
 * Add time.sleep to slow down the rump-up when making API calls: :white_check_mark:
 * Stocks in different markets are not traded on same days: need to create an homogeneous date grid (discrete data points):  :white_check_mark:
-
 * API secrets should be contained in a separate thingy:
 * Raise exception if stock does not exist, but continue run the code:
 * Raise exception when calls limit is reached, but continue run the code:
