@@ -227,12 +227,139 @@ def get_jsonList_prices_into_dataframe(_json_serialized_results:list,
     for n_rows in range(df1.shape[0]):
         
         df1.loc[n_rows,'converted_utc_timestamp']=df1['financial_data'][n_rows]['converted_utc_timestamp']
+
+        df1.loc[:,'converted_utc_date'] = df1.loc[:,'converted_utc_timestamp'].apply(lambda x: str(x)[0:10])
         
         for tv in target_variables:
             df1.loc[n_rows,tv]=df1['financial_data'][n_rows][tv]
         
-        sel_columns = ['stock','converted_utc_timestamp'] + target_variables
+        sel_columns = ['stock','converted_utc_timestamp','converted_utc_date'] + target_variables
         
         df2 = df1[sel_columns].copy()
+    
+    return df2
+
+
+def get_serialized_dividends_raw_resp(self,
+                            ticker:str):
+    ''' 
+    Serializes a row raw response, including 
+    the specified stock ticker for dividends.
+    '''
+    
+    import json
+    
+    return {"stock":ticker,
+                "Dividend": {
+                        "cash_amount": self.cash_amount,
+                        "declaration_date": self.declaration_date,
+                        "dividend_type": self.dividend_type,
+                        "ex_dividend_date": self.ex_dividend_date,
+                        "frequency": self.frequency,
+                        "pay_date": self.pay_date,
+                        "record_date": self.record_date,
+                }
+         }
+
+
+def get_top_x_dividends_by_ticker(ticker:str,
+                                  client,
+                                  number_dividends_back_in_time:int,
+                                  API_latency_secs:float):
+    
+    '''
+    Hackay way for picking up the last x dividends from the generator.
+    Assuming that min frequency of payment is month, then by setting
+    the parameter number_dividends_back_in_time to 12 should pick up the last
+    year dividends. API calls are delay by API_latency_secs
+    '''
+    
+    import itertools
+    import time
+    import json
+    
+    topdiv = itertools.islice(client.list_dividends(ticker=ticker), number_dividends_back_in_time)
+
+    jsonList = []
+    
+    for t in topdiv:
+        serie = get_serialized_dividends_raw_resp(self=t,ticker=ticker)
+        jsonDict = json.loads(json.dumps(serie))
+        jsonList.append(jsonDict)
+        time.sleep(API_latency_secs)
+        
+    return jsonList
+
+
+def get_jsonList_dividends_into_dataframe(DivjsonList:list,
+                                          measurable_time_variables:list) -> pd.DataFrame: 
+    
+    ''' 
+    Transform the raw extracted response into a dataframe, adding
+    the target variables as columns. 
+    '''
+    
+    import pandas as pd
+    
+    df1 = pd.DataFrame.from_dict(DivjsonList) 
+    
+    for n_rows in range(df1.shape[0]):
+    
+        df1.loc[n_rows,'cash_amount']=df1['Dividend'][n_rows]['cash_amount']
+        df1.loc[n_rows,'dividend_type']=df1['Dividend'][n_rows]['dividend_type']
+        df1.loc[n_rows,'frequency']=df1['Dividend'][n_rows]['frequency']
+    
+        for mt in measurable_time_variables:
+            df1.loc[n_rows,mt]=df1['Dividend'][n_rows][mt]
+        
+    sel_columns = ['stock','dividend_type','frequency','cash_amount'] + measurable_time_variables
+        
+    df2 = df1[sel_columns].copy()
         
     return df2
+
+
+def zero_prefixing(check_var:str):
+    
+    '''
+    Take a string, convert to integer and prefixes a zero 
+    if integer is less than 10.
+    '''
+    
+    if check_var < 10:
+            check_var_st = "0"+ str(check_var)
+    else:
+            check_var_st = str(check_var)
+            
+    return check_var_st
+    
+    
+def get_last_x_days_dividend_dataframe(Div_df:pd.DataFrame, 
+                                       number_days_looking_back:int,
+                                       measureble_time_variable:str) -> pd.DataFrame:
+
+    ''' 
+    Get as input the dataframe with dividends and spits out the
+    last number_days_looking_back days dividend flows.
+    '''
+    
+    import datetime as dt 
+    from datetime import datetime, timedelta
+    
+    current_date = dt.datetime.now().date()
+    current_date_shifted = current_date + timedelta(days=-number_days_looking_back)
+    
+    ''' 
+    Here I need to think about the case when there are no dividends at all, as an
+    expection, but this can be handled when I go aggregate.
+    '''
+    _tb_ = current_date_shifted
+    y, m, d = _tb_.year,zero_prefixing(_tb_.month),zero_prefixing(_tb_.day)
+    
+    current_date_shifted_filt = str(y)+"-"+str(m)+"-"+str(d)
+    
+    df3 = Div_df[Div_df.loc[:,measureble_time_variable]>=current_date_shifted_filt].reset_index(drop=True).copy()
+    
+    df3['current_date']=current_date_shifted_filt
+
+    return df3
