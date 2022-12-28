@@ -304,11 +304,10 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
     df1 = pd.DataFrame.from_dict(DivjsonList) 
     
     for n_rows in range(df1.shape[0]):
-    
-        df1.loc[n_rows,'cash_amount']=df1['Dividend'][n_rows]['cash_amount']
-        df1.loc[n_rows,'dividend_type']=df1['Dividend'][n_rows]['dividend_type']
-        df1.loc[n_rows,'frequency']=df1['Dividend'][n_rows]['frequency']
-    
+        
+        for v in ['cash_amount','dividend_type','frequency']:
+            df1.loc[n_rows,v]=df1['Dividend'][n_rows][v]
+        
         for mt in measurable_time_variables:
             df1.loc[n_rows,mt]=df1['Dividend'][n_rows][mt]
         
