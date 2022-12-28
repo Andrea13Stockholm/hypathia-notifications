@@ -170,6 +170,28 @@ def get_serialized_price_raw_resp(self,
             }
 
 
+def get_serialized_dividends_raw_resp(self,
+                            ticker:str):
+    ''' 
+    Serializes a row raw response, including 
+    the specified stock ticker for dividends.
+    '''
+    
+    import json
+    
+    return {"stock":ticker,
+                "Dividend": {
+                        "cash_amount": self.cash_amount,
+                        "declaration_date": self.declaration_date,
+                        "dividend_type": self.dividend_type,
+                        "ex_dividend_date": self.ex_dividend_date,
+                        "frequency": self.frequency,
+                        "pay_date": self.pay_date,
+                        "record_date": self.record_date,
+                }
+            }
+
+
 def get_serialized_price_raw_into_json(raw_response:list,
                                 ticker:str):
     ''' 
