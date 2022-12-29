@@ -16,7 +16,8 @@ calculate the dividend price ratio and sent alert based system.
 * Stocks in different markets are not traded on same days: need to create an homogeneous date grid (discrete data points):  :white_check_mark:
 * Get the dividends process to be called upon price process timestamps: :white_check_mark:
 * Calculate the dividend price ratio: :white_check_mark:
-* Check direktavkastning in Avanza to understand potential divergences:
+* Dividend type filter: specify as a filter the type of dividends. In direkavkastining only CD (ordinarie utdelningen) is considered; all the extraordinary dividends are marked as SD (special dividends) by the API :white_check_mark:
+* Check direktavkastning in Avanza to understand potential divergences (dividends over the year, not over the rolling past 12 months; tested AGNC,ARR and SCM): :white_check_mark:
 * API secrets should be contained in a separate thingy:
 * Raise exception if stock does not exist, but continue run the code:
 * Raise exception when calls limit is reached, but continue run the code:
@@ -27,4 +28,7 @@ calculate the dividend price ratio and sent alert based system.
 ### Main target variable
 The main target variable for this repo is direktavkastning, which is described as follows:
 "Direktavkastningen förändras i takt med att aktiekursen förändras. Vi visar direktavkastningen på aktieöversikten och räknar på gårdagens stängningskurs. Under ”Utdelningar” ser du hur hög utdelningen är i kronor. Förutom årets utdelning kan man även se fjolårets, och det kan vara intressant att se om bolaget har ökat eller minskat utdelningen jämfört med tidigare år".
+
+* aktien gårdagens stängningskurs;
+* utdelningar: årets utdelning (inte 12 månaders rolling window); bara ordinarie utdelning; varken bonusutdelning (i så fall finns det kapitalöverskott) eller inlösensaktier. Ett exempel: SCM (Stellus Capital Investment Corp) som betalt bonusutdelningar år 2022 på 0,02 USD.   
 

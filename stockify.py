@@ -269,8 +269,8 @@ def get_top_x_dividends_by_ticker(ticker:str,
     '''
     Hackey way for picking up the last x dividends from the generator.
     Assuming that min frequency for dividends to be paid is monthly and that we are 
-    query at most two years of daily prices, the max number of dividends
-    I need to get is 12*12 = 144.
+    query at most two years of daily prices, the minmax number of dividends
+    I need to get is 12*2 = 24.
     Need to increase the time.sleep sufficiently to avoid being blocked by the 
     max API call rule from polygon. 
     It seems that API_latency_secs >=2 secs works.
@@ -294,7 +294,8 @@ def get_top_x_dividends_by_ticker(ticker:str,
 
 
 def get_jsonList_dividends_into_dataframe(DivjsonList:list,
-                                          measurable_time_variables:list) -> pd.DataFrame: 
+                                          measurable_time_variables:list,
+                                          dividend_types:list) -> pd.DataFrame: 
     
     ''' 
     Transform the raw extracted response into a dataframe, adding
@@ -315,9 +316,11 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
         
     sel_columns = ['stock','dividend_type','frequency','cash_amount'] + measurable_time_variables
         
-    df2 = df1[sel_columns].copy()
+    df2 = df1[df1['dividend_type'].isin(dividend_types)].copy().reset_index(drop=True)
+    
+    df3 = df2[sel_columns].copy()
         
-    return df2
+    return df3
 
 
 def get_dividend_price_ratios(ticker:str,
@@ -326,38 +329,41 @@ def get_dividend_price_ratios(ticker:str,
     
     ''' 
     Returns a dataframe with dividend price ratio over time.
-    Dividends are aggregated over 12 months. This window is daily updated
-    by shifting each observed price date t by 12 months and summing all 
-    dividends paids and falling in this (daily) interval.
+    Dividends are aggregated over ordinary payments for the current year. 
+    This window is daily updated. 
     '''
     
     from datetime import datetime, timedelta
     import pandas as pd 
     import datetime as dt 
-    
+    import numpy as np
+
     pdf = prices_df[prices_df['stock']==ticker].reset_index(drop=True).copy()
     ddf = dividends_df[dividends_df['stock']==ticker].reset_index(drop=True).copy()
-    
+        
     pdf['converted_utc_timestamp']= pd.to_datetime(pdf['converted_utc_timestamp'])
     ddf['pay_date']=pd.to_datetime(ddf['pay_date'])
-    
-    pdf['converted_utc_timestamp_back_shifted']=pdf['converted_utc_timestamp'].apply(lambda x: x+timedelta(days=-365))
-    
-    for n_rows in range(pdf.shape[0]):
+    ddf['pay_date_year']=ddf['pay_date'].apply(lambda x: x.year)
         
-        tub,tlb = pdf.loc[n_rows,'converted_utc_timestamp'],pdf.loc[n_rows,'converted_utc_timestamp_back_shifted']
-         
+    for n_rows in range(pdf.shape[0]):
+            
+        tub = pdf.loc[n_rows,'converted_utc_timestamp']
+        tub_year = tub.year
+            
         if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
-            rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
-            pdf.loc[rn,'n_paid_dividens_12_m'] = ddf[(ddf['pay_date']>=tlb)&(ddf['pay_date']<=tub)].shape[0]
-            pdf.loc[rn,'sum_paid_dividens_12_m'] = ddf[(ddf['pay_date']>=tlb)&(ddf['pay_date']<=tub)].cash_amount.sum()
-    
-    pdf['DP_ratio']=pdf['sum_paid_dividens_12_m']/pdf['close']
-    
+                rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
+                __mask__ =  (ddf['pay_date']<=tub)&(ddf['pay_date_year']==tub_year)
+                pdf.loc[rn,'n_paid_dividens_current_year'] = ddf[__mask__].shape[0]
+                pdf.loc[rn,'sum_paid_dividens_current_year'] = ddf[__mask__].cash_amount.sum()
+        
 
-    aggr_df = pdf[['stock','close','converted_utc_timestamp','converted_utc_timestamp_back_shifted',
-                   'n_paid_dividens_12_m','sum_paid_dividens_12_m','DP_ratio']]
-    
+    #pdf['previous_close'] = pdf['close'].shift(1)
+    #pdf = pdf[~(pdf['previous_close'].isna())]
+    pdf['DP_ratio']=pdf['sum_paid_dividens_current_year']*100/pdf['close']
+        
+    aggr_df = pdf[['stock','close','converted_utc_timestamp',
+                    'n_paid_dividens_current_year','sum_paid_dividens_current_year','DP_ratio']]
+        
     aggr_df = aggr_df.sort_values(by=['converted_utc_timestamp'],ascending=False).reset_index(drop=True)
     
     return aggr_df 
