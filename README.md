@@ -24,4 +24,7 @@ calculate the dividend price ratio and sent alert based system.
 * Automatize the notification: run the job on a schedule, send the notification when threshold is reached: Airflow
 * Check if I need to create virtual env 
 
+### Main target variable
+The main target variable for this repo is direktavkastning, which is described as follows:
+"Direktavkastningen förändras i takt med att aktiekursen förändras. Vi visar direktavkastningen på aktieöversikten och räknar på gårdagens stängningskurs. Under ”Utdelningar” ser du hur hög utdelningen är i kronor. Förutom årets utdelning kan man även se fjolårets, och det kan vara intressant att se om bolaget har ökat eller minskat utdelningen jämfört med tidigare år".
 

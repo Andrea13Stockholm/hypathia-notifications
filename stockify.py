@@ -355,7 +355,7 @@ def get_dividend_price_ratios(ticker:str,
     pdf['DP_ratio']=pdf['sum_paid_dividens_12_m']/pdf['close']
     
 
-    aggr_df = pdf[['stock','converted_utc_timestamp','converted_utc_timestamp_back_shifted',
+    aggr_df = pdf[['stock','close','converted_utc_timestamp','converted_utc_timestamp_back_shifted',
                    'n_paid_dividens_12_m','sum_paid_dividens_12_m','DP_ratio']]
     
     aggr_df = aggr_df.sort_values(by=['converted_utc_timestamp'],ascending=False).reset_index(drop=True)
