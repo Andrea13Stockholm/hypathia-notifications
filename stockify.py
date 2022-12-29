@@ -319,7 +319,7 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
     df2 = df1[df1['dividend_type'].isin(dividend_types)].copy().reset_index(drop=True)
     
     df3 = df2[sel_columns].copy()
-        
+            
     return df3
 
 
@@ -347,9 +347,10 @@ def get_dividend_price_ratios(ticker:str,
         
     for n_rows in range(pdf.shape[0]):
             
-        tub = pdf.loc[n_rows,'converted_utc_timestamp']
-        tub_year = tub.year
-            
+        tub_ts= pdf.loc[n_rows,'converted_utc_timestamp']
+        tub = tub_ts.to_datetime64()
+        tub_year = tub_ts.year
+        
         if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
                 rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
                 __mask__ =  (ddf['pay_date']<=tub)&(ddf['pay_date_year']==tub_year)
