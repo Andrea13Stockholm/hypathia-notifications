@@ -16,6 +16,7 @@ calculate the dividend price ratio and sent alert based system.
 * Stocks in different markets are not traded on same days: need to create an homogeneous date grid (discrete data points):  :white_check_mark:
 * Get the dividends process to be called upon price process timestamps: :white_check_mark:
 * Calculate the dividend price ratio: :white_check_mark:
+* Check direktavkastning in Avanza to understand potential divergences:
 * API secrets should be contained in a separate thingy:
 * Raise exception if stock does not exist, but continue run the code:
 * Raise exception when calls limit is reached, but continue run the code:
