@@ -261,24 +261,26 @@ def get_serialized_dividends_raw_resp(self,
                 }
          }
 
-
 def get_top_x_dividends_by_ticker(ticker:str,
                                   client,
-                                  number_dividends_back_in_time:int,
-                                  API_latency_secs:float):
+                                  API_latency_secs:float,
+                                  n_API_calls:int):
     
     '''
-    Hackay way for picking up the last x dividends from the generator.
-    Assuming that min frequency of payment is month, then by setting
-    the parameter number_dividends_back_in_time to 12 should pick up the last
-    year dividends. API calls are delay by API_latency_secs
+    Hackey way for picking up the last x dividends from the generator.
+    Assuming that min frequency for dividends to be paid is monthly and that we are 
+    query at most two years of daily prices, the max number of dividends
+    I need to get is 12*12 = 144.
+    Need to increase the time.sleep sufficiently to avoid being blocked by the 
+    max API call rule from polygon. 
+    It seems that API_latency_secs >=2 secs works.
     '''
     
     import itertools
     import time
     import json
     
-    topdiv = itertools.islice(client.list_dividends(ticker=ticker), number_dividends_back_in_time)
+    topdiv = itertools.islice(client.list_dividends(ticker=ticker), n_API_calls)
 
     jsonList = []
     
@@ -318,47 +320,44 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
     return df2
 
 
-def zero_prefixing(check_var:str):
+def get_dividend_price_ratios(ticker:str,
+                              prices_df:pd.DataFrame,
+                              dividends_df:pd.DataFrame) -> pd.DataFrame:
     
-    '''
-    Take a string, convert to integer and prefixes a zero 
-    if integer is less than 10.
-    '''
-    
-    if check_var < 10:
-            check_var_st = "0"+ str(check_var)
-    else:
-            check_var_st = str(check_var)
-            
-    return check_var_st
-    
-    
-def get_last_x_days_dividend_dataframe(Div_df:pd.DataFrame, 
-                                       number_days_looking_back:int,
-                                       measureble_time_variable:str) -> pd.DataFrame:
-
     ''' 
-    Get as input the dataframe with dividends and spits out the
-    last number_days_looking_back days dividend flows.
+    Returns a dataframe with dividend price ratio over time.
+    Dividends are aggregated over 12 months. This window is daily updated
+    by shifting each observed price date t by 12 months and summing all 
+    dividends paids and falling in this (daily) interval.
     '''
     
-    import datetime as dt 
     from datetime import datetime, timedelta
+    import pandas as pd 
+    import datetime as dt 
     
-    current_date = dt.datetime.now().date()
-    current_date_shifted = current_date + timedelta(days=-number_days_looking_back)
+    pdf = prices_df[prices_df['stock']==ticker].reset_index(drop=True).copy()
+    ddf = dividends_df[dividends_df['stock']==ticker].reset_index(drop=True).copy()
     
-    ''' 
-    Here I need to think about the case when there are no dividends at all, as an
-    expection, but this can be handled when I go aggregate.
-    '''
-    _tb_ = current_date_shifted
-    y, m, d = _tb_.year,zero_prefixing(_tb_.month),zero_prefixing(_tb_.day)
+    pdf['converted_utc_timestamp']= pd.to_datetime(pdf['converted_utc_timestamp'])
+    ddf['pay_date']=pd.to_datetime(ddf['pay_date'])
     
-    current_date_shifted_filt = str(y)+"-"+str(m)+"-"+str(d)
+    pdf['converted_utc_timestamp_back_shifted']=pdf['converted_utc_timestamp'].apply(lambda x: x+timedelta(days=-365))
     
-    df3 = Div_df[Div_df.loc[:,measureble_time_variable]>=current_date_shifted_filt].reset_index(drop=True).copy()
+    for n_rows in range(pdf.shape[0]):
+        
+        tub,tlb = pdf.loc[n_rows,'converted_utc_timestamp'],pdf.loc[n_rows,'converted_utc_timestamp_back_shifted']
+         
+        if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
+            rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
+            pdf.loc[rn,'n_paid_dividens_12_m'] = ddf[(ddf['pay_date']>=tlb)&(ddf['pay_date']<=tub)].shape[0]
+            pdf.loc[rn,'sum_paid_dividens_12_m'] = ddf[(ddf['pay_date']>=tlb)&(ddf['pay_date']<=tub)].cash_amount.sum()
     
-    df3['current_date']=current_date_shifted_filt
+    pdf['DP_ratio']=pdf['sum_paid_dividens_12_m']/pdf['close']
+    
 
-    return df3
+    aggr_df = pdf[['stock','converted_utc_timestamp','converted_utc_timestamp_back_shifted',
+                   'n_paid_dividens_12_m','sum_paid_dividens_12_m','DP_ratio']]
+    
+    aggr_df = aggr_df.sort_values(by=['converted_utc_timestamp'],ascending=False).reset_index(drop=True)
+    
+    return aggr_df 
