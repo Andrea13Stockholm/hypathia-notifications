@@ -1,6 +1,8 @@
 company_name,ticker,target_variable,alert_level_percentage,provider
 ARMOUR Residential REIT Inc,ARR,DP_ratio,0.21,Ivano
 AGNC Investment Corp,AGNC,DP_ratio,0.15,Ivano
-Samhällsbyggnadsbo. i Norden B,SBB B,DP_ratio,0.09,Ivano
+Samhällsbyggnadsbo. i Norden B,SBB-B,DP_ratio,0.09,Ivano
 Stellus Capital Investment Corp,SCM,DP_ratio,0.08,Ivano
-Corem Property Group D,CORE D,DP_ratio,0.10,Ivano
+Corem Property Group D,CORE-Ddssd,DP_ratio,0.10,Ivano
+Apple,AAPL,,
+assad,----,,

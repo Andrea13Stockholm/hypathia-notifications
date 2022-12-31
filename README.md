@@ -18,9 +18,10 @@ calculate the dividend price ratio and sent alert based system.
 * Calculate the dividend price ratio: :white_check_mark:
 * Dividend type filter: specify as a filter the type of dividends. In direkavkastining only CD (ordinarie utdelningen) is considered; all the extraordinary dividends are marked as SD (special dividends) by the API :white_check_mark:
 * Check direktavkastning in Avanza to understand potential divergences (dividends over the year, not over the rolling past 12 months; tested AGNC,ARR and SCM): :white_check_mark:
+* Raise exception when calls limit is reached, but continue run the code (reaching the rump-up invalidate the API calls, so used time.sleep(secs) instead): :white_check_mark: 
+* Raise exception if stock does not exist, but continue run the code (raised Exception via requests):  :white_check_mark: 
+* Add the DoNotify flag
 * API secrets should be contained in a separate thingy:
-* Raise exception if stock does not exist, but continue run the code:
-* Raise exception when calls limit is reached, but continue run the code:
 * Get posted in slack:
 * Automatize the notification: run the job on a schedule, send the notification when threshold is reached: Airflow
 * Check if I need to create virtual env 

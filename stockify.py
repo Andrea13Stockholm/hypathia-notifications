@@ -42,6 +42,21 @@ def check_max_lookback_years(max_lookback_years: float):
     return max_lookback_years
 
 
+def is_numb_in_range(numb,lower_bound,upper_bound):
+    '''
+    Check if number is between to given numbers,
+    extremes included.
+    ''' 
+    
+    if lower_bound > upper_bound:
+        exit
+    else:
+        if numb in range(lower_bound,upper_bound+1):
+            return True
+        else:
+            return False
+
+
 def get_daily_time_buckets(max_lookback_years:float,
                            current_is_timestamp:bool,
                            frequency:str,
@@ -91,6 +106,126 @@ def get_daily_time_buckets(max_lookback_years:float,
     return time_buckets 
 
 
+def get_HTTP_response_status_code_get_call(ticker:str,
+                                           API_key:str):
+    
+    '''
+    Provides HTTP status codes on host for GET calls with
+    verbose responses for status codes ranges [200,299],
+    [300,399], [400,599]. Outside of ranges codes raise a
+    warning.
+    ''' 
+        
+    import requests
+    import json
+    import datetime as dt 
+    from datetime import timedelta as td  
+
+    host='https://api.polygon.io'
+    
+    current_date = dt.datetime.now().date()
+    start = current_date - td(days=7)
+    
+    url = f'{host}/v2/aggs/ticker/{ticker}/range/1/day/{start}/{current_date}?adjusted=true&sort=asc&limit=120&apiKey={API_key}'
+
+    status_code, response_body = requests.get(url).status_code, json.loads(requests.get(url).text)
+    response_status = response_body['status']
+
+    if is_numb_in_range(status_code,200,299) and response_status.lower() !='error':
+        response_content = response_body['resultsCount']
+            
+    elif is_numb_in_range(status_code,200,299) and response_status.lower() =='error':
+        response_content = response_body['error']
+            
+    elif is_numb_in_range(status_code,400,599):
+        response_content = str(response_body['error'][0:47])
+
+    else:
+        response_content=''
+        print("HTTP status code, not codified: " + str(status_code))
+        
+    object_response = [ticker,status_code,response_status,response_content]
+    
+    if object_response[1]==200 and object_response[2]!='ERROR' and object_response[3]>0:
+        forward_API_request = True
+    else:
+        forward_API_request = False
+    
+    return object_response,forward_API_request
+
+
+def get_HTTP_status_codes_by_sequencing_get_calls(API_keys:list,
+                                                  stocks_tickers:list,
+                                                  time_sleep:float):
+        
+        '''
+        Hackey way to get status codes for all the stocks using API keys
+        from n different accounts.
+        '''      
+        
+        import math as m 
+        import numpy as np
+        import pandas as pd
+        import time
+        
+        count=0
+        
+        API_keys_used = []
+        object_responses=[]
+        forward_API_requests=[]
+        stocks=[]
+        
+        for st in stocks_tickers:
+                stocks.append(st)
+                count +=1
+                number_API_keys = len(API_keys)
+                dec_part = np.round(m.modf(count/number_API_keys)[0],4)
+
+                if dec_part == np.round(1/number_API_keys,4):
+                        pos_key = 0
+                elif dec_part== np.round(2/number_API_keys,4):
+                        pos_key = 1  
+                else:
+                        pos_key = 2
+        
+                object_response,forward_API_request= get_HTTP_response_status_code_get_call(ticker=st,
+                                                                                        API_key=API_keys[pos_key])
+                
+                time.sleep(time_sleep)
+                API_keys_used.append(API_keys[pos_key])
+                object_responses.append(object_response)
+                forward_API_requests.append(forward_API_request)
+
+        HTTP_summary = pd.concat([pd.Series(API_keys_used),
+                                  pd.Series(stocks),
+                                  pd.Series(object_responses),
+                                  pd.Series(forward_API_requests)],axis=1,
+                                 keys=['API_key','stock','Object_response','Forward_API_request'])
+        return HTTP_summary
+
+
+def get_stock_list_GET_calls(HTTP_summary:pd.DataFrame):
+    
+    '''
+    Get the list of stocks to get data after
+    preliminary check call on the API. 
+    '''
+
+    stocks_ticker_GET = []
+
+    for n_rows in range(0,HTTP_summary.shape[0]):
+        
+        if HTTP_summary.loc[n_rows,'Forward_API_request']==True:
+            
+            stocks_ticker_GET.append(HTTP_summary.loc[n_rows,'stock'])
+            
+        else:
+            
+            print(HTTP_summary.loc[n_rows,'Object_response'])
+            
+    return stocks_ticker_GET
+    
+    
 def get_p_process_by_ticker(API_key:str,
                             client,
                             ticker:str,
