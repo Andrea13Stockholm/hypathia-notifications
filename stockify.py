@@ -503,3 +503,33 @@ def get_dividend_price_ratios(ticker:str,
     aggr_df = aggr_df.sort_values(by=['converted_utc_timestamp'],ascending=False).reset_index(drop=True)
     
     return aggr_df 
+
+
+def DoNotifyFlag(ds_dp: pd.DataFrame,
+                stocks_requirments: pd.DataFrame 
+                 ) -> pd.DataFrame:
+    
+    ''' 
+    It takes the DP_ratio dataset and compare the latest 
+    DP_ratio with the warning levels per stock, given back 
+    for which stock the alert needs to be triggered.
+    '''
+    
+    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':""}
+    
+    last_data_per_stock = ds_dp.groupby(['stock'])['converted_utc_timestamp'].max()
+    
+    for s in last_data_per_stock.index:
+    
+        alp = float(stocks_requirments[stocks_requirments['ticker']==s].alert_level_percentage.reset_index(drop=True)[0])*100
+        last_obs = last_data_per_stock[last_data_per_stock.index==s][0]
+        
+        dp_s=ds_dp[(ds_dp['stock']==s)&(ds_dp['converted_utc_timestamp']==last_obs)]
+        
+        if dp_s.DP_ratio[0] > alp:
+            
+            DoAlertFlag.update({'ticker':s,
+                                'current_level':dp_s.DP_ratio[0],
+                                'alert_level':alp})
+            
+    return DoAlertFlag
