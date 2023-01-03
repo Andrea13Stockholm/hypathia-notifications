@@ -1,2 +1,2 @@
 polygon-api-client
-
+slack_sdk

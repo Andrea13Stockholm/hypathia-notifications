@@ -21,7 +21,8 @@ calculate the dividend price ratio and sent alert based system.
 * Raise exception when calls limit is reached, but continue run the code (reaching the rump-up invalidate the API calls, so used time.sleep(secs) instead): :white_check_mark: 
 * Raise exception if stock does not exist, but continue run the code (raised Exception via requests):  :white_check_mark: 
 * Add the DoNotify flag: :white_check_mark: 
-* Get posted in slack:
+* Get posted in slack: :white_check_mark: 
+* Decide with Ivano which other notifications we want to show in Slack:
 * API secrets should be contained in a separate thingy:
 * Automatize the notification: run the job on a schedule, send the notification when threshold is reached: Airflow
 * Check if I need to create virtual env 

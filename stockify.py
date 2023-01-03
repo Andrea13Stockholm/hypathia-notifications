@@ -515,7 +515,7 @@ def DoNotifyFlag(ds_dp: pd.DataFrame,
     for which stock the alert needs to be triggered.
     '''
     
-    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':""}
+    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':"",'data_latest_timestamp':""}
     
     last_data_per_stock = ds_dp.groupby(['stock'])['converted_utc_timestamp'].max()
     
@@ -530,6 +530,25 @@ def DoNotifyFlag(ds_dp: pd.DataFrame,
             
             DoAlertFlag.update({'ticker':s,
                                 'current_level':dp_s.DP_ratio[0],
-                                'alert_level':alp})
+                                'alert_level':alp,
+                                'data_latest_timestamp':last_obs
+                                })
             
     return DoAlertFlag
+
+
+def DoNotifySendMessage(webhook_url,
+             message):
+
+    ''' 
+    Send a slack message in channel "dividend-strategy" to notify if a stock is over the limit.
+    '''
+    
+    import requests 
+    
+    body_message= '{"text":"%s"}' %message
+    response = requests.post(webhook_url,
+                             data =body_message)
+    
+    return response.status_code,response.text
+    
