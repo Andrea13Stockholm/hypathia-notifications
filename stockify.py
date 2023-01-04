@@ -546,9 +546,16 @@ def DoNotifySendMessage(webhook_url,
     
     import requests 
     
-    body_message= '{"text":"%s"}' %message
-    response = requests.post(webhook_url,
-                             data =body_message)
+    if len(message['ticker'])>0:
+        body_message= '{"text":"%s"}' %message
+        response = requests.post(webhook_url,
+                                data =body_message)
     
+    else:
+        message="No stock over any alert level."
+        body_message= '{"text":"%s"}' %message
+        response = requests.post(webhook_url,
+                                data =body_message)
+        
     return response.status_code,response.text
     
