@@ -460,11 +460,13 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
 
 def get_dividend_price_ratios(ticker:str,
                               prices_df:pd.DataFrame,
-                              dividends_df:pd.DataFrame) -> pd.DataFrame:
+                              dividends_df:pd.DataFrame,
+                              calculus_type:str) -> pd.DataFrame:
     
     ''' 
     Returns a dataframe with dividend price ratio over time.
-    Dividends are aggregated over ordinary payments for the current year. 
+    Dividends are aggregated over ordinary payments based on calculus_type.
+    Calculus_type can be 'current-year-based' or 'rolling-12-m'.
     This window is daily updated. 
     '''
     
@@ -472,42 +474,63 @@ def get_dividend_price_ratios(ticker:str,
     import pandas as pd 
     import datetime as dt 
     import numpy as np
-
+    
     pdf = prices_df[prices_df['stock']==ticker].reset_index(drop=True).copy()
     ddf = dividends_df[dividends_df['stock']==ticker].reset_index(drop=True).copy()
-        
+   
     pdf['converted_utc_timestamp']= pd.to_datetime(pdf['converted_utc_timestamp'])
     ddf['pay_date']=pd.to_datetime(ddf['pay_date'])
-    ddf['pay_date_year']=ddf['pay_date'].apply(lambda x: x.year)
+
+    if calculus_type =='current-year-based':
         
-    for n_rows in range(pdf.shape[0]):
+        ddf['pay_date_year']=ddf['pay_date'].apply(lambda x: x.year)
             
-        tub_ts= pdf.loc[n_rows,'converted_utc_timestamp']
-        tub = tub_ts.to_datetime64()
-        tub_year = tub_ts.year
-        
-        if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
+        for n_rows in range(pdf.shape[0]):
+                
+            tub_ts= pdf.loc[n_rows,'converted_utc_timestamp']
+            tub = tub_ts.to_datetime64()
+            tub_year = tub_ts.year
+            
+            if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
                 rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
                 __mask__ =  (ddf['pay_date']<=tub)&(ddf['pay_date_year']==tub_year)
                 pdf.loc[rn,'n_paid_dividens_current_year'] = ddf[__mask__].shape[0]
                 pdf.loc[rn,'sum_paid_dividens_current_year'] = ddf[__mask__].cash_amount.sum()
-        
-
-    #pdf['previous_close'] = pdf['close'].shift(1)
-    #pdf = pdf[~(pdf['previous_close'].isna())]
-    pdf['DP_ratio']=pdf['sum_paid_dividens_current_year']*100/pdf['close']
-        
-    aggr_df = pdf[['stock','close','converted_utc_timestamp',
+    
+                    
+        pdf['DP_ratio']=pdf['sum_paid_dividens_current_year']*100/pdf['close']
+                
+        aggr_df = pdf[['stock','close','converted_utc_timestamp',
                     'n_paid_dividens_current_year','sum_paid_dividens_current_year','DP_ratio']]
+    
+    elif calculus_type == 'rolling-12-m':
+        
+        for n_rows in range(pdf.shape[0]):
+            
+            tub_ts= pdf.loc[n_rows,'converted_utc_timestamp']
+            tlb_ts = tub_ts + timedelta(days=-365)
+            tub, tlb = tub_ts.to_datetime64(),tlb_ts.to_datetime64()
+            
+            if pdf[pdf['converted_utc_timestamp']==tub].index.size >0:
+                rn = pdf[pdf['converted_utc_timestamp']==tub].index[0]
+                __mask__ =  (ddf['pay_date']<=tub)&(ddf['pay_date']>=tlb)
+                pdf.loc[rn,'n_paid_dividens_rolling12m'] = ddf[__mask__].shape[0]
+                pdf.loc[rn,'sum_paid_dividens_rolling12m'] = ddf[__mask__].cash_amount.sum()
+                
+        pdf['DP_ratio']=pdf['sum_paid_dividens_rolling12m']*100/pdf['close']
+        
+        aggr_df = pdf[['stock','close','converted_utc_timestamp',
+                    'n_paid_dividens_rolling12m','sum_paid_dividens_rolling12m','DP_ratio']]
         
     aggr_df = aggr_df.sort_values(by=['converted_utc_timestamp'],ascending=False).reset_index(drop=True)
-    
-    return aggr_df 
+
+    return aggr_df
 
 
 def DoNotifyFlag(ds_dp: pd.DataFrame,
-                stocks_requirments: pd.DataFrame 
-                 ) -> pd.DataFrame:
+                stocks_requirments: pd.DataFrame,
+                ticker:str,
+                calculus_type:str) -> pd.DataFrame:
     
     ''' 
     It takes the DP_ratio dataset and compare the latest 
@@ -515,30 +538,30 @@ def DoNotifyFlag(ds_dp: pd.DataFrame,
     for which stock the alert needs to be triggered.
     '''
     
-    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':"",'data_latest_timestamp':""}
+    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':"",'data_latest_timestamp':"",
+                   'calculus_type':""}
     
-    last_data_per_stock = ds_dp.groupby(['stock'])['converted_utc_timestamp'].max()
+    last_date_per_stock = ds_dp[ds_dp['stock']==ticker]['converted_utc_timestamp'].max()
     
-    for s in last_data_per_stock.index:
-    
-        alp = float(stocks_requirments[stocks_requirments['ticker']==s].alert_level_percentage.reset_index(drop=True)[0])*100
-        last_obs = last_data_per_stock[last_data_per_stock.index==s][0]
+    alp = float(stocks_requirments[stocks_requirments['ticker']==ticker].alert_level_percentage.reset_index(drop=True)[0])*100 
+    dp_s=ds_dp[(ds_dp['stock']==ticker)&(ds_dp['converted_utc_timestamp']==last_date_per_stock)]
         
-        dp_s=ds_dp[(ds_dp['stock']==s)&(ds_dp['converted_utc_timestamp']==last_obs)]
-        
-        if dp_s.DP_ratio[0] > alp:
-            
-            DoAlertFlag.update({'ticker':s,
+    if dp_s.DP_ratio[0] > alp:
+    
+            DoAlertFlag.update({'ticker':ticker,
                                 'current_level':dp_s.DP_ratio[0],
                                 'alert_level':alp,
-                                'data_latest_timestamp':last_obs
+                                'data_latest_timestamp':last_date_per_stock,
+                                'calculus_type':calculus_type
                                 })
-            
+    print(ticker)
+    
     return DoAlertFlag
 
 
 def DoNotifySendMessage(webhook_url,
-             message):
+                        ticker:str,
+                        message):
 
     ''' 
     Send a slack message in channel "dividend-strategy" to notify if a stock is over the limit.
@@ -552,10 +575,12 @@ def DoNotifySendMessage(webhook_url,
                                 data =body_message)
     
     else:
-        message="No stock over any alert level."
+        message=ticker + " : not over any alert level."
         body_message= '{"text":"%s"}' %message
         response = requests.post(webhook_url,
                                 data =body_message)
+    
+    print(response.status_code,response.text)
         
     return response.status_code,response.text
     
