@@ -635,7 +635,7 @@ def slackify(webhook_url,
     import json 
     import numpy as np 
     
-    if AlertData['flag_alert']==True:
+    if AlertData['flag_alert']==True and AlertData['ticker']==ticker:
     
         alert_body={
         "blocks": [
@@ -740,11 +740,11 @@ def slackify(webhook_url,
     if AlertData['flag_alert']==True:
 
         response = requests.post(webhook_url,
-                            data =json.dumps(alert_body))
+                    data =json.dumps(alert_body))
     
         print(response.status_code,response.text)
 
-    return response.status_code,response.text if AlertData['flag_alert']==True else "no-breach-no-alert"
+        return response.status_code,response.text
     
     
 def create_csv_storage_notification_streams(folder_to_search_in,
