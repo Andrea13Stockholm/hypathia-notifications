@@ -542,6 +542,23 @@ def zero_prefixing(check_var:str):
     return check_var_st
 
 
+def from_timestamp_to_string_with_zero_prefixing(provided_timpestamp) -> str:
+    
+    ''' 
+    Takes a timpestamp and provides a string after having pre-fixed the number with zero 
+    if digit less than 10.
+    '''
+    
+    alias = provided_timpestamp
+    
+    h,min,s=zero_prefixing(alias.hour),zero_prefixing(alias.minute),zero_prefixing(alias.second)
+    y,mon,d= alias.year,zero_prefixing(alias.month),zero_prefixing(alias.day)
+    
+    __when__ = str(y)+"-"+str(mon)+"-"+str(d)+" " + str(h)+":"+str(min)+":"+str(s)
+    
+    return __when__
+
+
 def DoNotifyFlag(ds_dp: pd.DataFrame,
                 stocks_requirments: pd.DataFrame,
                 ticker:str,
@@ -565,10 +582,8 @@ def DoNotifyFlag(ds_dp: pd.DataFrame,
                    'flag_alert':""}
     
     last_date = ds_dp[ds_dp['stock']==ticker]['converted_utc_timestamp'].max()
-    y,mon,d= last_date.year,zero_prefixing(last_date.month),zero_prefixing(last_date.day)
-    h,min,s=zero_prefixing(last_date.hour),zero_prefixing(last_date.minute),zero_prefixing(last_date.second)
     
-    __when__ = str(y)+"-"+str(mon)+"-"+str(d)+" " + str(h)+":"+str(min)+":"+str(s)
+    __when__ = from_timestamp_to_string_with_zero_prefixing(last_date)
     
     
     alp = float(stocks_requirments[stocks_requirments['ticker']==ticker].alert_level_percentage.reset_index(drop=True)[0])*100 
@@ -618,6 +633,7 @@ def slackify(webhook_url,
     
     import requests
     import json 
+    import numpy as np 
     
     if AlertData['flag_alert']==True:
     
@@ -638,7 +654,7 @@ def slackify(webhook_url,
                 "elements": [
                     {
                         "type": "plain_text",
-                        "text": ":red_circle: Current direktavkastning: " + str(AlertData['current_level'])+"%"
+                        "text": ":red_circle: Current direktavkastning: " + str(np.round(AlertData['current_level'],2))+"%"
                     }
                 ]
             },
@@ -661,37 +677,11 @@ def slackify(webhook_url,
                 ]
             },
             {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": ":moneybag: Cumulative ordinary dividends: " + str(AlertData['cumulative_dividends'])
-                    }
-                ]
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": ":calendar: Latest data timestamp: " + AlertData['data_latest_timestamp']
-                    }
-                ]
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": "Method for cumulating dividends: "+ AlertData['dividends_aggregation_method']
-                    }
-                ]
-            },
-            {
                 "type": "divider"
             }
         ]
-    }
+    } 
+   
     else:
          alert_body={
         "blocks": [
@@ -719,7 +709,7 @@ def slackify(webhook_url,
                 "elements": [
                     {
                         "type": "plain_text",
-                        "text": ":red_circle: Current direktavkastning: " + str(AlertData['current_level'])+"%"
+                        "text": ":red_circle: Current direktavkastning: " + str(np.round(AlertData['current_level'],2))+"%"
                     }
                 ]
             },
@@ -742,42 +732,61 @@ def slackify(webhook_url,
                 ]
             },
             {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": ":moneybag: Cumulative ordinary dividends: " + str(AlertData['cumulative_dividends'])
-                    }
-                ]
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": ":calendar: Latest data timestamp: " + AlertData['data_latest_timestamp']
-                    }
-                ]
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "plain_text",
-                        "text": "Method for cumulating dividends: "+ AlertData['dividends_aggregation_method']
-                    }
-                ]
-            },
-            {
                 "type": "divider"
             }
         ]
     }
          
-    response = requests.post(webhook_url,
+    if AlertData['flag_alert']==True:
+
+        response = requests.post(webhook_url,
                             data =json.dumps(alert_body))
     
-    print(response.status_code,response.text)
-        
-    return response.status_code,response.text
+        print(response.status_code,response.text)
+
+    return response.status_code,response.text if AlertData['flag_alert']==True else "no-breach-no-alert"
     
+    
+def create_csv_storage_notification_streams(folder_to_search_in,
+                                            current_runtime_str,
+                                            event_streamed_data,
+                                            service:str):
+    
+    '''
+    Takes event streamed data from notification service
+    '''
+    
+    import os 
+    import glob
+    import json
+    from pandas.errors import EmptyDataError 
+    
+    os.chdir(folder_to_search_in)
+
+    path = 'c:\\'
+    extension = 'csv'
+    result = glob.glob('*.{}'.format(extension))
+    
+    __when__ = current_runtime_str
+    
+    do_notify_streamed = pd.DataFrame(pd.Series(__when__).repeat(1), columns=['runtime_timestap'])
+    do_notify_streamed['service']=service
+    do_notify_streamed['event_data']=pd.Series(pd.Series(json.dumps(event_streamed_data)))
+
+    if len(result)==0:
+        
+        do_notify_streamed.to_csv("NotifyServiceEventData.csv",index=False)
+        print("Event storage created with first stream " + str(__when__))
+        
+    else:
+        try:
+            __notify__events=pd.read_csv('NotifyServiceEventData.csv')
+            
+            if __when__ > __notify__events.runtime_timestap.max():
+                
+                do_notify_streamed.to_csv("NotifyServiceEventData.csv",mode='a',header=False,index=False)
+                print("Event storage updated with latest stream " + str(__when__))
+                
+        except EmptyDataError as e:
+            print(e)
+            print("Remove empty file from storage")

@@ -26,10 +26,12 @@ calculate the dividend price ratio and sent alert based system.
 * Prettify the notifications/UX design: :white_check_mark: 
 * Things to think: asyncronicity between prices and dividends (sometimes prices after new dividends release: which price then?);
 sometimes in Avanza stock A has closing price t-2 instead of t-1 and in direktavkastining it is used t-2 instead of t-1;
-degration of direktakvastinig back in time because I need API calls to look 1 year back wrt the first stock price in the timeseries: (for time being, it is fine as is!) :white_check_mark:  
+degration of direktakvastinig back in time because I need API calls to look 1 year back wrt the first stock price in the timeseries: (for time being, it is fine as is!) :white_check_mark: 
+* Create a storage csv for stock-alerts-do-notify: : :white_check_mark: 
 * API secrets should be contained in a separate thingy:
 * Automatize the notification: run the job on a schedule, send the notification when threshold is reached: Airflow
 * Check if I need to create virtual env 
+* Where to store the NotifyServiceEventData.csv when the job will be chroned/run in Airflow (for now in local):
 
 
 ### Main target variable
