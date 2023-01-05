@@ -461,12 +461,12 @@ def get_jsonList_dividends_into_dataframe(DivjsonList:list,
 def get_dividend_price_ratios(ticker:str,
                               prices_df:pd.DataFrame,
                               dividends_df:pd.DataFrame,
-                              calculus_type:str) -> pd.DataFrame:
+                              dividends_aggregation_method:str) -> pd.DataFrame:
     
     ''' 
     Returns a dataframe with dividend price ratio over time.
-    Dividends are aggregated over ordinary payments based on calculus_type.
-    Calculus_type can be 'current-year-based' or 'rolling-12-m'.
+    Dividends are aggregated over ordinary payments based on dividends_aggregation_method.
+    Dividends_aggregation_method can be 'current-year-based' or 'rolling-12-m'.
     This window is daily updated. 
     '''
     
@@ -481,7 +481,7 @@ def get_dividend_price_ratios(ticker:str,
     pdf['converted_utc_timestamp']= pd.to_datetime(pdf['converted_utc_timestamp'])
     ddf['pay_date']=pd.to_datetime(ddf['pay_date'])
 
-    if calculus_type =='current-year-based':
+    if dividends_aggregation_method =='current-year-based':
         
         ddf['pay_date_year']=ddf['pay_date'].apply(lambda x: x.year)
             
@@ -503,7 +503,7 @@ def get_dividend_price_ratios(ticker:str,
         aggr_df = pdf[['stock','close','converted_utc_timestamp',
                     'n_paid_dividens_current_year','sum_paid_dividens_current_year','DP_ratio']]
     
-    elif calculus_type == 'rolling-12-m':
+    elif dividends_aggregation_method == 'rolling-12-m':
         
         for n_rows in range(pdf.shape[0]):
             
@@ -527,10 +527,25 @@ def get_dividend_price_ratios(ticker:str,
     return aggr_df
 
 
+def zero_prefixing(check_var:str):
+
+    '''
+    Take a string, convert to integer and prefixes a zero 
+    if integer is less than 10.
+    '''
+     
+    if check_var < 10:
+        check_var_st = "0"+ str(check_var)
+    else:
+        check_var_st = str(check_var)
+        
+    return check_var_st
+
+
 def DoNotifyFlag(ds_dp: pd.DataFrame,
                 stocks_requirments: pd.DataFrame,
                 ticker:str,
-                calculus_type:str) -> pd.DataFrame:
+                dividends_aggregation_method:str) -> pd.DataFrame:
     
     ''' 
     It takes the DP_ratio dataset and compare the latest 
@@ -538,47 +553,229 @@ def DoNotifyFlag(ds_dp: pd.DataFrame,
     for which stock the alert needs to be triggered.
     '''
     
-    DoAlertFlag = {'ticker':"",'current_level':"",'alert_level':"",'data_latest_timestamp':"",
-                   'calculus_type':""}
+    import numpy as np
     
-    last_date_per_stock = ds_dp[ds_dp['stock']==ticker]['converted_utc_timestamp'].max()
+    AlertData = {'ticker':"",
+                   'current_level':"",
+                   'alert_level':"",
+                   'close':"",
+                   'cumulative_dividends':"",
+                   'data_latest_timestamp':"",
+                   'dividends_aggregation_method':"",
+                   'flag_alert':""}
+    
+    last_date = ds_dp[ds_dp['stock']==ticker]['converted_utc_timestamp'].max()
+    y,mon,d= last_date.year,zero_prefixing(last_date.month),zero_prefixing(last_date.day)
+    h,min,s=zero_prefixing(last_date.hour),zero_prefixing(last_date.minute),zero_prefixing(last_date.second)
+    
+    __when__ = str(y)+"-"+str(mon)+"-"+str(d)+" " + str(h)+":"+str(min)+":"+str(s)
+    
     
     alp = float(stocks_requirments[stocks_requirments['ticker']==ticker].alert_level_percentage.reset_index(drop=True)[0])*100 
-    dp_s=ds_dp[(ds_dp['stock']==ticker)&(ds_dp['converted_utc_timestamp']==last_date_per_stock)]
+    dp_s=ds_dp[(ds_dp['stock']==ticker)&(ds_dp['converted_utc_timestamp']==last_date)]
+    
+    if dividends_aggregation_method == 'rolling-12-m':
+        cumulative_dividends = np.round(dp_s['sum_paid_dividens_rolling12m'][0],4)
+    
+    elif dividends_aggregation_method == 'current-year-based':
+        cumulative_dividends = np.round(dp_s['sum_paid_dividens_current_year'][0],4)
+        
         
     if dp_s.DP_ratio[0] > alp:
     
-            DoAlertFlag.update({'ticker':ticker,
-                                'current_level':dp_s.DP_ratio[0],
+            AlertData.update({'ticker':ticker,
+                                'current_level':np.round(dp_s.DP_ratio[0],4),
                                 'alert_level':alp,
-                                'data_latest_timestamp':last_date_per_stock,
-                                'calculus_type':calculus_type
+                                'close':np.round(dp_s.close[0],2),
+                                'cumulative_dividends':cumulative_dividends,
+                                'data_latest_timestamp':__when__,
+                                'dividends_aggregation_method':dividends_aggregation_method,
+                                'flag_alert':True
                                 })
+    else:
+            AlertData.update({'ticker':ticker,
+                                'current_level':np.round(dp_s.DP_ratio[0],4),
+                                'alert_level':alp,
+                                'close':np.round(dp_s.close[0],2),
+                                'cumulative_dividends':cumulative_dividends,
+                                'data_latest_timestamp':__when__,
+                                'dividends_aggregation_method':dividends_aggregation_method,
+                                'flag_alert':False
+                                })
+    
     print(ticker)
     
-    return DoAlertFlag
+    return AlertData
 
 
-def DoNotifySendMessage(webhook_url,
-                        ticker:str,
-                        message):
+def slackify(webhook_url,
+            ticker:str,
+            AlertData):
 
     ''' 
-    Send a slack message in channel "dividend-strategy" to notify if a stock is over the limit.
+    Send a slack message in channel to notify if a stock is over the limit.
     '''
     
-    import requests 
+    import requests
+    import json 
     
-    if len(message['ticker'])>0:
-        body_message= '{"text":"%s"}' %message
-        response = requests.post(webhook_url,
-                                data =body_message)
+    if AlertData['flag_alert']==True:
     
+        alert_body={
+        "blocks": [
+            {
+                "type": "divider"
+            },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "ALERT REACHED for stock " + AlertData['ticker']
+                }
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":red_circle: Current direktavkastning: " + str(AlertData['current_level'])+"%"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":robot_face: Alert trigger: " + str(AlertData['alert_level'])+"%"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":chart: Stock price: " + str(AlertData['close'])
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":moneybag: Cumulative ordinary dividends: " + str(AlertData['cumulative_dividends'])
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":calendar: Latest data timestamp: " + AlertData['data_latest_timestamp']
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "Method for cumulating dividends: "+ AlertData['dividends_aggregation_method']
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            }
+        ]
+    }
     else:
-        message=ticker + " : not over any alert level."
-        body_message= '{"text":"%s"}' %message
-        response = requests.post(webhook_url,
-                                data =body_message)
+         alert_body={
+        "blocks": [
+            {
+                "type": "divider"
+            },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Stock " + AlertData['ticker']
+                }
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Alert not reached*"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":red_circle: Current direktavkastning: " + str(AlertData['current_level'])+"%"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":robot_face: Alert trigger: " + str(AlertData['alert_level'])+"%"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":chart: Stock price: " + str(AlertData['close'])
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":moneybag: Cumulative ordinary dividends: " + str(AlertData['cumulative_dividends'])
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": ":calendar: Latest data timestamp: " + AlertData['data_latest_timestamp']
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "Method for cumulating dividends: "+ AlertData['dividends_aggregation_method']
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            }
+        ]
+    }
+         
+    response = requests.post(webhook_url,
+                            data =json.dumps(alert_body))
     
     print(response.status_code,response.text)
         
