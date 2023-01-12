@@ -41,3 +41,23 @@ The main target variable for this repo is direktavkastning, which is described a
 * aktien gårdagens stängningskurs;
 * utdelningar: årets utdelning (inte 12 månaders rolling window); bara ordinarie utdelning; varken bonusutdelning (i så fall finns det kapitalöverskott) eller inlösensaktier. Ett exempel: SCM (Stellus Capital Investment Corp) som betalt bonusutdelningar år 2022 på 0,02 USD.   
 
+### How to set up Apache-airflow 
+Followed official documentation: https://airflow.apache.org/docs/apache-airflow/stable/start.html
+
+In the terminal, follow the steps:
+
+* Create virtual environment in the repo : virtualenv airflow-hypathia;
+* Activate virtuaenv cd airflow-hypathia/bin
+* Run source activate
+* export AIRFLOW_HOME=~/airflow
+* pip install apache-airflow
+* airflow db init
+* airflow users create \
+    --username admin \
+    --firstname Peter \
+    --lastname Parker \
+    --role Admin \
+    --email spiderman@superhero.org
+* airflow webserver --port 8080
+
+
